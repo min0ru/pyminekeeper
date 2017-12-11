@@ -2,7 +2,6 @@ import datetime
 import json
 import os
 import subprocess
-import sys
 import time
 import urllib.request
 from multiprocessing import Process
@@ -261,12 +260,20 @@ def miner_keeper():
     """
 
     # TODO: move me into settings.py / json
-    miner_exe_path = r'C:\Miners\xmr-stak\xmr-stak.exe'
+    cold_start_scripts = [
+        r'C:\miners\tools\devcon\devcon.exe disable "PCI\VEN_1002&DEV_687F"',
+        r'C:\miners\tools\devcon\devcon.exe enable "PCI\VEN_1002&DEV_687F"',
+        r'C:\miners\tools\overdriventool\OverdriveNTool.exe -p1vega1100_900_905 -p2vega1100_900_905 -p3vega1100_900_905"',
+    ]
+    colds_start_sleep_interval = 5
+    miner_exe_path = r'C:\miners\xmr-stak\xmr-stak.exe'
     target_hashrate = 1100
+    hot_restart_interval_minutes = 5
     max_run_time_minutes = 2
     initial_sleep_time_minutes = 1
     check_interval_seconds = 10
     process_exit_time_seconds = 5
+
 
     # xmr-stak api
     xmr_stak_api = {
@@ -292,8 +299,27 @@ def miner_keeper():
 
     hashrate_api_params = xmr_stak_api
 
+    last_start_time = None
+
     while True:
-        # TODO: cold_start and cold_start_needed check
+
+        if not last_start_time:
+            cold_start_needed = True
+            print('First start in current session. Launching cold start scripts.')
+        elif (datetime.datetime.now() - last_start_time).seconds < hot_restart_interval_minutes * 60:
+            cold_start_needed = True
+            print('Last restart was less then {} minutes ago. Launching cold start scripts.'
+                  .format(hot_restart_interval_minutes))
+        else:
+            cold_start_needed = False
+            print('Hot restarting miner')
+
+        if cold_start_needed:
+            for cold_start_script in cold_start_scripts:
+                print('Running: "{}"'.format(cold_start_script))
+                subprocess.Popen(cold_start_script)
+                time.sleep(colds_start_sleep_interval)
+
         print('Running miner for {} minutes'.format(max_run_time_minutes))
         miner_process = start_miner(miner_exe_path)
         last_start_time = datetime.datetime.now()
