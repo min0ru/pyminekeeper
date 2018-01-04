@@ -74,7 +74,7 @@ def get_json_data(url):
     """
     Load JSON data from given url
     :param url: full miner json api url
-    :return: 
+    :return:
     """
     # TODO add http basic auth support
     response = urllib.request.urlopen(url)
@@ -167,6 +167,8 @@ def parse_castxmr_hashrate(status_data):
     :return: current miner hashrate or -1 in case of error.
     """
     hashrate = status_data.get('total_hash_rate', -1)
+    if hashrate > 0:
+        hashrate = hashrate / 1000
     return hashrate
 
 
@@ -261,17 +263,20 @@ def miner_keeper():
 
     # TODO: move me into settings.py / json
     cold_start_scripts = [
-        r'C:\miners\tools\devcon\devcon.exe disable "PCI\VEN_1002&DEV_687F"',
-        r'C:\miners\tools\devcon\devcon.exe enable "PCI\VEN_1002&DEV_687F"',
-        r'C:\miners\tools\overdriventool\OverdriveNTool.exe -p1vega1100_900_905 -p2vega1100_900_905 -p3vega1100_900_905"',
+        #r'C:\miners\tools\devcon\devcon.exe disable "PCI\VEN_1002&DEV_687F"',
+        #r'C:\miners\tools\devcon\devcon.exe enable "PCI\VEN_1002&DEV_687F"',
+        r"powershell Get-PnpDevice | where {$_.friendlyname -like 'Radeon Rx Vega'} | Disable-PnpDevice -ErrorAction Ignore -Confirm:$false | Out-Null",
+        r"powershell Get-PnpDevice | where {$_.friendlyname -like 'Radeon Rx Vega'} | Enable-PnpDevice -ErrorAction Ignore -Confirm:$false | Out-Null",
+        r'C:\miners\tools\overdriventool\OverdriveNTool.exe -p1vega1100_900_905 -p2vega1100_900_905 -p3vega1100_900_905 -p4vega1100_900_905 -p5vega1100_905_910 -p6vega1100_900_905',
     ]
-    colds_start_sleep_interval = 5
+    colds_start_sleep_interval = 16
+    #miner_exe_path = r'C:\miners\cast_xmr-vega\run.bat'
     miner_exe_path = r'C:\miners\xmr-stak\xmr-stak.exe'
-    target_hashrate = 1100
+    target_hashrate = 11500
     hot_restart_interval_minutes = 5
-    max_run_time_minutes = 2
-    initial_sleep_time_minutes = 1
-    check_interval_seconds = 10
+    max_run_time_minutes = 40
+    initial_sleep_time_minutes = 2
+    check_interval_seconds = 20
     process_exit_time_seconds = 5
 
 
@@ -297,6 +302,7 @@ def miner_keeper():
         'parse_function': parse_castxmr_hashrate,
     }
 
+    #hashrate_api_params = cast_xmr_api
     hashrate_api_params = xmr_stak_api
 
     last_start_time = None
