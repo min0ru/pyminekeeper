@@ -1,3 +1,4 @@
+import collections
 import datetime
 import json
 import logging
@@ -298,6 +299,21 @@ def run_time_ended(last_start_time, max_run_time_minutes=30):
     return False
 
 
+def hashrate_stuck(measurements, duplicates=10):
+    """
+    Function checks if all of given hashrate measurments are the same.
+    This usually indicates that miner is actually not working but indicates that hashrate is stable.
+    :param measurements: list of last N measurements (use deque with maxlen parameter).
+    :param duplicates: number of duplicates measurements to check
+    :return:
+    """
+    if len(measurements) < duplicates:
+        return False
+    elif len(set(measurements)) == 1:
+        return True
+    else:
+        return False
+
 def miner_keeper():
     """
     Function running miner and tracks it's process status, hashrate etc.
@@ -305,6 +321,7 @@ def miner_keeper():
     :return: None
     """
 
+    # Pyminekeeper Settings Parameters
     # TODO: move me into settings.py / json
     cold_start_scripts = [
         #r'C:\miners\tools\devcon\devcon.exe disable "PCI\VEN_1002&DEV_687F"',
@@ -322,6 +339,7 @@ def miner_keeper():
     initial_sleep_time_minutes = 2
     check_interval_seconds = 20
     process_exit_time_seconds = 5
+    hashrate_duplicates_number = 10
 
     # xmr-stak api
     xmr_stak_api = {
@@ -348,9 +366,15 @@ def miner_keeper():
     #hashrate_api_params = cast_xmr_api
     hashrate_api_params = xmr_stak_api
 
+    # Initialization parameters
+    restarts_count = 0
     last_start_time = None
+    hashrate_measurements = collections.deque(maxlen=hashrate_duplicates_number)
 
     while True:
+
+        # Clearing hashrate_measurments on new start
+        hashrate_measurements.clear()
 
         if not last_start_time:
             cold_start_needed = True
@@ -362,6 +386,10 @@ def miner_keeper():
         else:
             cold_start_needed = False
             logger.info('Hot restarting miner')
+
+        if last_start_time:
+            restarts_count += 1
+            logger.info('Restarting miner for {} time'.format(restarts_count))
 
         if cold_start_needed:
             for cold_start_script in cold_start_scripts:
@@ -386,6 +414,7 @@ def miner_keeper():
                 break
 
             current_hashrate = get_hashrate(hashrate_api_params)
+
             if current_hashrate <= 0:
                 hashrate_ok = False
                 logger.error('Error in getting miner hashrate! Restarting miner!')
@@ -398,6 +427,15 @@ def miner_keeper():
             else:
                 logger.info('[OK] Miner hashrate: {} is above target {}!'
                       .format(current_hashrate, target_hashrate))
+
+            if hashrate_ok:
+                hashrate_measurements.append(current_hashrate)
+                if hashrate_stuck(hashrate_measurements, hashrate_duplicates_number):
+                    logger.error('Hashrate measurements check failed.'
+                                 'All last {} measurements are exactly the same. Looks like miner is stuck.'
+                                 .format(hashrate_duplicates_number))
+                    logger.info('Restarting miner!')
+                    hashrate_ok = False
 
         if miner_process.is_alive():
             logger.info('Killing miner process.')
