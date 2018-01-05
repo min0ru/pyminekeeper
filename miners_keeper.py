@@ -309,8 +309,8 @@ def miner_keeper():
     cold_start_scripts = [
         #r'C:\miners\tools\devcon\devcon.exe disable "PCI\VEN_1002&DEV_687F"',
         #r'C:\miners\tools\devcon\devcon.exe enable "PCI\VEN_1002&DEV_687F"',
-        r"powershell Get-PnpDevice | where {$_.friendlyname -like 'Radeon Rx Vega'} | Disable-PnpDevice -ErrorAction Ignore -Confirm:$false | Out-Null",
-        r"powershell Get-PnpDevice | where {$_.friendlyname -like 'Radeon Rx Vega'} | Enable-PnpDevice -ErrorAction Ignore -Confirm:$false | Out-Null",
+        r"powershell Get-PnpDevice | where {$_.friendlyname -like '*Radeon*'} | Disable-PnpDevice -ErrorAction Ignore -Confirm:$false | Out-Null",
+        r"powershell Get-PnpDevice | where {$_.friendlyname -like '*Radeon*'} | Enable-PnpDevice -ErrorAction Ignore -Confirm:$false | Out-Null",
         r'C:\miners\tools\overdriventool\OverdriveNTool.exe -p1vega1100_900_905 -p2vega1100_900_905 -p3vega1100_900_905 -p4vega1100_900_905 -p5vega1100_905_910 -p6vega1100_900_905',
     ]
     colds_start_sleep_interval = 16
@@ -318,11 +318,10 @@ def miner_keeper():
     miner_exe_path = r'C:\miners\xmr-stak\xmr-stak.exe'
     target_hashrate = 11500
     hot_restart_interval_minutes = 5
-    max_run_time_minutes = 40
+    max_run_time_minutes = 60
     initial_sleep_time_minutes = 2
     check_interval_seconds = 20
     process_exit_time_seconds = 5
-
 
     # xmr-stak api
     xmr_stak_api = {
@@ -377,6 +376,7 @@ def miner_keeper():
         logger.info('Sleeping for {} minutes to stabilize hashrate before checks'.format(initial_sleep_time_minutes))
         time.sleep(initial_sleep_time_minutes * 60)
         hashrate_ok = True
+        logger.info('Starting Miner checks every {} seconds'.format(check_interval_seconds))
 
         while run_time_ended(last_start_time, max_run_time_minutes) and hashrate_ok:
             time.sleep(check_interval_seconds)
