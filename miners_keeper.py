@@ -293,8 +293,8 @@ def run_time_ended(last_start_time, max_run_time_minutes=30):
     :param max_run_time_minutes: miner running time.
     :return: Boolean indicates if miner should be restarted.
     """
-    current_run_time_minutes = (datetime.datetime.now() - last_start_time).seconds * 60
-    if current_run_time_minutes > max_run_time_minutes:
+    run_time_minutes = (datetime.datetime.now() - last_start_time).seconds / 60.0
+    if run_time_minutes > max_run_time_minutes:
         return True
     return False
 
@@ -373,7 +373,6 @@ def miner_keeper():
 
     while True:
 
-        # Clearing hashrate_measurments on new start
         hashrate_measurements.clear()
 
         if not last_start_time:
@@ -403,11 +402,19 @@ def miner_keeper():
         logger.info('Miner started pid {}.'.format(miner_process.pid))
         logger.info('Sleeping for {} minutes to stabilize hashrate before checks'.format(initial_sleep_time_minutes))
         time.sleep(initial_sleep_time_minutes * 60)
+
         hashrate_ok = True
+        restart_by_timer_needed = False
+        hashrate_measurements.clear()
+
         logger.info('Starting Miner checks every {} seconds'.format(check_interval_seconds))
 
-        while run_time_ended(last_start_time, max_run_time_minutes) and hashrate_ok:
+        while not restart_by_timer_needed and hashrate_ok:
             time.sleep(check_interval_seconds)
+
+            restart_by_timer_needed = run_time_ended(last_start_time, max_run_time_minutes)
+            if restart_by_timer_needed:
+                logger.info('Miner restart by timer activated')
 
             if not miner_process.is_alive():
                 logger.info('Miner process is dead! Restarting!')
