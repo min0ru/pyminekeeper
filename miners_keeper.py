@@ -1,11 +1,44 @@
 import datetime
 import json
+import logging
 import os
 import string
 import subprocess
 import time
 import urllib.request
 from multiprocessing import Process
+
+
+def setup_logger():
+    """
+    Create and setting up logger
+    :return:
+    """
+
+    FORMAT = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    DATE_FORMAT = '%d.%m.%y %H:%M:%S'
+
+    formatter = logging.Formatter(fmt=FORMAT, datefmt=DATE_FORMAT)
+
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(formatter)
+
+    file_handler = logging.FileHandler('pyminekeeper.log')
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+    return logger
+
+
+# Initializing global application log handler
+logger = setup_logger()
 
 
 def kill(pid):
@@ -30,11 +63,11 @@ def miner_process_function(miner_exe_path, new_window=True):
     base_dir = os.path.dirname(miner_exe_path)
     if base_dir:
         os.chdir(os.path.dirname(miner_exe_path))
-    print('Subprocess starts "{}"'.format(miner_exe_path))
+    logger.info('Subprocess starts "{}"'.format(miner_exe_path))
     child = subprocess.Popen(miner_exe_path, creationflags=subprocess.CREATE_NEW_CONSOLE)
-    print('Started new console process with pid {}'.format(child.pid))
+    logger.info('Started new console process with pid {}'.format(child.pid))
     child.wait()
-    print('Subprocess exits')
+    logger.info('Subprocess exits')
 
 
 def start_miner(miner_path):
@@ -221,14 +254,14 @@ def parse_xmrstak_hashrate(status_data):
           "best":[
              0,0,0,0,0,0,0,0,0,0
           ],
-          "error_log":[
+          "error_logger":[
           ]
        },
        "connection":{
           "pool":"etn-eu1.nanopool.org:13333",
           "uptime":55,
           "ping":0,
-          "error_log":[
+          "error_logger":[
              {
                 "last_seen":1512946470,
                 "text":"[etn-us-west1.nanopool.org::13333] CONNECT error: GetAddrInfo: Error description. "
@@ -322,26 +355,26 @@ def miner_keeper():
 
         if not last_start_time:
             cold_start_needed = True
-            print('First start in current session. Launching cold start scripts.')
+            logger.info('First start in current session. Launching cold start scripts.')
         elif (datetime.datetime.now() - last_start_time).seconds < hot_restart_interval_minutes * 60:
             cold_start_needed = True
-            print('Last restart was less then {} minutes ago. Launching cold start scripts.'
+            logger.info('Last restart was less then {} minutes ago. Launching cold start scripts.'
                   .format(hot_restart_interval_minutes))
         else:
             cold_start_needed = False
-            print('Hot restarting miner')
+            logger.info('Hot restarting miner')
 
         if cold_start_needed:
             for cold_start_script in cold_start_scripts:
-                print('Running: "{}"'.format(cold_start_script))
+                logger.info('Running: "{}"'.format(cold_start_script))
                 subprocess.Popen(cold_start_script)
                 time.sleep(colds_start_sleep_interval)
 
-        print('Running miner for {} minutes'.format(max_run_time_minutes))
+        logger.info('Running miner for {} minutes'.format(max_run_time_minutes))
         miner_process = start_miner(miner_exe_path)
         last_start_time = datetime.datetime.now()
-        print('Miner started pid {}. Sleeping for {} minutes to stabilize hashrate before checks'
-              .format(miner_process.pid, initial_sleep_time_minutes))
+        logger.info('Miner started pid {}.'.format(miner_process.pid))
+        logger.info('Sleeping for {} minutes to stabilize hashrate before checks'.format(initial_sleep_time_minutes))
         time.sleep(initial_sleep_time_minutes * 60)
         hashrate_ok = True
 
@@ -349,25 +382,27 @@ def miner_keeper():
             time.sleep(check_interval_seconds)
 
             if not miner_process.is_alive():
-                print('Miner process is dead! Restarting!')
+                logger.info('Miner process is dead! Restarting!')
                 break
 
             current_hashrate = get_hashrate(hashrate_api_params)
             if current_hashrate <= 0:
                 hashrate_ok = False
-                print('Error in getting miner hashrate! Restarting miner!')
+                logger.error('Error in getting miner hashrate! Restarting miner!')
+                logger.info('Restarting miner!')
             elif current_hashrate < target_hashrate:
                 hashrate_ok = False
-                print('Error! Current hashrate {} is lower than target {}. Restarting miner!'
+                logger.error('Current hashrate {} is lower than target {}.'
                       .format(current_hashrate, target_hashrate))
+                logger.info('Restarting miner!')
             else:
-                print('[OK] Miner hashrate: {} is above target hashrate {}!'
+                logger.info('[OK] Miner hashrate: {} is above target {}!'
                       .format(current_hashrate, target_hashrate))
 
         if miner_process.is_alive():
-            print('Killing miner process.')
+            logger.info('Killing miner process.')
             kill(miner_process.pid)
-            print('Waiting process to exit.')
+            logger.info('Waiting process to exit.')
             time.sleep(process_exit_time_seconds)
 
 
