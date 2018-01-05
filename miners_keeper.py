@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import string
 import subprocess
 import time
 import urllib.request
@@ -47,6 +48,16 @@ def start_miner(miner_path):
     return miner_process
 
 
+def whipe_non_unicode(bytestring):
+    """
+    Removes non-utf8 characters from given byte string
+    :param bytestring: byte string.
+    :return: cleaned string.
+    """
+
+    return ''.join(chr(c) for c in bytestring if chr(c) in string.printable)
+
+
 def api_url(api_params):
     """
     Get miner url for hashrate monitor api
@@ -77,10 +88,12 @@ def get_json_data(url):
     :return:
     """
     # TODO add http basic auth support
-    response = urllib.request.urlopen(url)
+    response = urllib.request.urlopen(url, timeout=6)
     if response.code != 200:
         return None
-    json_data = json.loads(response.read())
+    data = response.read()
+    data = whipe_non_unicode(data)
+    json_data = json.loads(data)
     return json_data
 
 
@@ -226,8 +239,6 @@ def parse_xmrstak_hashrate(status_data):
 
     :return:
     """
-
-    # TODO: Fix encoding error in connection error message
 
     try:
         hashrate_info = status_data.get('hashrate', None)
