@@ -16,7 +16,7 @@ def setup_logger():
     :return:
     """
 
-    FORMAT = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    FORMAT = '[%(asctime)s] %(name)-12s %(levelname)-8s %(message)s'
     DATE_FORMAT = '%d.%m.%y %H:%M:%S'
 
     formatter = logging.Formatter(fmt=FORMAT, datefmt=DATE_FORMAT)
